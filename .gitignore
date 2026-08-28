@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# uploaded product images (local disk / mounted volume)
+/uploads
 
 # vercel
 .vercel
