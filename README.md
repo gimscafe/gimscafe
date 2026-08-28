@@ -102,6 +102,9 @@ npm run dev
 
 ## PayHere setup
 
+> Full developer guide — flow, env vars, local test scripts, go-live steps,
+> troubleshooting table: [`docs/PAYHERE.md`](docs/PAYHERE.md).
+
 ### The domain rule (this is what "Unauthorized payment request" means)
 
 PayHere's checkout only accepts a request whose `merchant_id` + `hash` were
