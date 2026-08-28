@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { placeOrder, type CheckoutState } from "@/app/actions/checkout";
 import { formatMoney } from "@/lib/money";
+import { commerce } from "@/lib/site";
 
 function FieldError({ errors }: { errors?: string[] }) {
   if (!errors?.length) return null;
@@ -130,7 +131,7 @@ export function CheckoutForm({
               <span>
                 <span className="block text-sm font-medium">Collect in store</span>
                 <span className="text-muted-foreground block text-xs">
-                  Horton Place, Colombo 07 · Free
+                  {commerce.pickupLocation} · Free
                 </span>
               </span>
             </Label>
