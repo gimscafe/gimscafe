@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/money";
 export const metadata: Metadata = {
   title: "How ordering works",
   description:
-    "How to order a cake from Sugar & Bloom — lead times, delivery, collection and payment.",
+    "How to order a cake from Gim's Cafe — lead times, delivery, collection and payment.",
 };
 
 const STEPS = [

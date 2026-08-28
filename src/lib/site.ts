@@ -9,15 +9,15 @@ function intFromEnv(value: string | undefined, fallback: number): number {
 }
 
 export const site = {
-  name: "Sugar & Bloom",
+  name: "Gim's Cafe",
   tagline: "Cake Studio",
-  fullName: "Sugar & Bloom Cake Studio",
+  fullName: "Gim's Cafe Cake Studio",
   description:
     "Hand-crafted celebration cakes, dessert tables and everyday treats — baked to order in Colombo and delivered across the city.",
-  phone: "+94 77 123 4567",
-  whatsapp: "+94771234567",
-  email: "hello@sugarandbloom.lk",
-  address: "27 Horton Place, Colombo 07, Sri Lanka",
+  phone: "+94 77 461 0713",
+  whatsapp: "+94774610713",
+  email: "gimscafe98@gmail.com",
+  address: "350 Sinhagiri Building, Colombo Road, Delgoda",
   instagram: "https://instagram.com",
   facebook: "https://facebook.com",
   /** Public origin; used for absolute URLs (PayHere callbacks, sitemap, OG). */
@@ -37,7 +37,7 @@ export const commerce = {
   /** Minimum days between "today" and the requested fulfilment date. */
   defaultLeadTimeDays: intFromEnv(process.env.DEFAULT_LEAD_TIME_DAYS, 2),
   maxQuantityPerItem: 20,
-  pickupLocation: "27 Horton Place, Colombo 07",
+  pickupLocation: "350 Sinhagiri Building, Colombo Road, Delgoda",
 } as const;
 
 export type FulfillmentType = "delivery" | "pickup";

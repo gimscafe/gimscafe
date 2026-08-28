@@ -94,7 +94,7 @@ export default async function HomePage() {
         <div className="container-page grid gap-6 py-8 sm:grid-cols-3">
           {[
             [CakeSlice, "Baked to order", "Nothing sits in a display case — every cake is made for your date."],
-            [Truck, "Colombo-wide delivery", "Doorstep delivery across the city, or collect from Horton Place."],
+            [Truck, "Colombo-wide delivery", "Doorstep delivery across the city, or collect from Delgoda."],
             [ShieldCheck, "Secure PayHere checkout", "Pay by card, wallet or online banking. Card details never touch our servers."],
           ].map(([Icon, title, copy]) => (
             <div key={title as string} className="flex gap-3">

@@ -102,26 +102,57 @@ npm run dev
 
 ## PayHere setup
 
-1. Create an account at <https://www.payhere.lk> and add your domain under
-   **Settings → Domains & Credentials**. You'll get a **Merchant ID** and
-   **Merchant Secret**.
-2. Set env vars:
-   ```
-   PAYHERE_MERCHANT_ID=1XXXXXX
-   PAYHERE_MERCHANT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxx
-   PAYHERE_MODE=sandbox      # switch to "live" for production
-   NEXT_PUBLIC_SITE_URL=https://your-domain.lk
-   ```
-3. The **Notify URL** PayHere calls is `‹NEXT_PUBLIC_SITE_URL›/api/payhere/notify`.
-   It must be publicly reachable — add it in the PayHere dashboard too.
-4. Payment flow:
-   - Checkout creates a `pending_payment` order, then redirects the browser to
-     PayHere with a signed `hash`.
-   - On completion PayHere `POST`s to `/api/payhere/notify`; the signature is
-     verified (`md5sig`) and the order is moved to `paid` (or `cancelled`).
-   - The customer is returned to `/order/‹id›`.
-5. **Sandbox test card:** `4916217501611292`, exp `12/25`, CVV `123` (see
-   <https://support.payhere.lk/api-&-mobile-sdk/sandbox-mode>).
+### The domain rule (this is what "Unauthorized payment request" means)
+
+PayHere's checkout only accepts a request whose `merchant_id` + `hash` were
+generated with the **Merchant Secret of an *approved domain*** on the account,
+**and** whose `return_url` / `cancel_url` / `notify_url` all live on that same
+approved domain. Get any of that wrong and PayHere shows
+*"Unauthorized payment request — this is a merchant's error"*.
+
+- **Sandbox:** `localhost` is the only host approved automatically. Add it under
+  **Settings → Domains & Credentials → Add Domain → `localhost`** and copy the
+  Merchant Secret it generates.
+- **Shared sub-domains are rejected.** `*.up.railway.app`, `*.vercel.app`,
+  `*.trycloudflare.com`, free ngrok, etc. cannot be added — you need a
+  **registrable domain you own** (see [Cloudflare](#cloudflare) below).
+- The **App ID / App Secret** from *Settings → API & Webhooks* ("Create API") is
+  a different, OAuth credential for the REST APIs — **not** what checkout uses.
+
+### Env vars
+
+```
+PAYHERE_MERCHANT_ID=1XXXXXX
+PAYHERE_MERCHANT_SECRET=<the secret shown for your approved domain>
+PAYHERE_MODE=sandbox            # only the exact word "live" flips to production
+NEXT_PUBLIC_SITE_URL=https://your-domain.lk   # host must equal the approved domain
+```
+
+`NEXT_PUBLIC_SITE_URL` is inlined at **build time** — after changing it you must
+redeploy, not just restart. `PAYHERE_DEBUG=1` logs the outgoing (non-secret)
+checkout fields. `PAYHERE_NOTIFY_URL` can override just the callback URL, but it
+must still be on an approved domain.
+
+### Payment flow
+
+- Checkout creates a `pending_payment` order, then redirects the browser to
+  PayHere with a signed `hash`.
+- On completion PayHere makes a server-to-server `POST` to `/api/payhere/notify`;
+  the `md5sig` is verified and the order moves to `paid` (or `cancelled`).
+  **This callback — not the browser redirect — is what marks an order paid**, so
+  `notify_url` must be reachable from PayHere's servers.
+- The customer is returned to `/order/‹id›`.
+
+### Testing
+
+- **Sandbox test card:** `4916217501611292`, exp `12/25`, CVV `123`, OTP
+  `123456` (see <https://support.payhere.lk/api-&-mobile-sdk/sandbox-mode>).
+- **Local dev:** PayHere can't call `http://localhost`, so after paying in the
+  browser run
+  `npx dotenv -e .env.local -- tsx scripts/fire-notify.mts SB-XXXXXX` to deliver
+  the same signed callback (`-2` / `-1` as a 2nd arg simulates failed /
+  cancelled). `scripts/payhere-smoke.mts` posts a checkout form straight to
+  PayHere to confirm the credentials + domain are accepted.
 
 If `PAYHERE_MERCHANT_ID` is blank, the app still works — orders are placed as
 `pending_payment` with "pay on collection / bank transfer" instructions.
@@ -162,13 +193,35 @@ If `PAYHERE_MERCHANT_ID` is blank, the app still works — orders are placed as
 
 ### Cloudflare
 
-1. Add your domain to Cloudflare and point the nameservers.
+1. Register the domain (Cloudflare Registrar or anywhere) and add it to
+   Cloudflare; point the nameservers.
 2. In Railway, app service → **Settings → Networking → Custom Domain**, add
-   `your-domain.lk`. Railway shows a `CNAME` target.
-3. In Cloudflare DNS add a `CNAME` (`@` / `www`) to that target, **Proxied**.
-4. SSL/TLS mode: **Full (strict)**.
-5. Make sure `NEXT_PUBLIC_SITE_URL` matches the final public URL, and add that URL
-   as an allowed domain in the PayHere dashboard.
+   `your-domain.lk` (and `www`). Railway shows a `CNAME` target.
+3. In Cloudflare **DNS** add a `CNAME` (`@` / `www`) to that target, **Proxied**
+   (orange cloud).
+4. **SSL/TLS → Overview → Full (strict)**. Railway serves a valid cert;
+   *Flexible* causes a redirect loop.
+5. **Let PayHere's webhook through.** Cloudflare bot/security features can
+   challenge PayHere's server-to-server `POST` and the order then never flips to
+   paid. Add a **WAF → Custom rule**: *when* URI Path equals
+   `/api/payhere/notify` *then* **Skip** → Managed rules, Bot Fight Mode, Rate
+   limiting. Also keep the default "no cache on `/api/*`" (route is
+   `force-dynamic`, but a Cache Rule bypass makes it explicit).
+6. Set on Railway and **redeploy**:
+   - `NEXT_PUBLIC_SITE_URL = https://your-domain.lk` (exact host, no trailing `/`)
+   - `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` = a stable 32-byte base64 string
+     (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`),
+     so checkout Server Actions keep working across redeploys / multiple
+     instances.
+7. In **PayHere → Settings → Domains & Credentials** add `your-domain.lk`
+   (no `https://`, no path). Wait for status **Allowed**, then copy *that
+   domain's* Merchant Secret into `PAYHERE_MERCHANT_SECRET`.
+8. Only after the live domain is approved, set `PAYHERE_MODE=live` and swap in
+   the **live** dashboard's Merchant ID + Secret.
+
+`next.config.ts` reads `NEXT_PUBLIC_SITE_URL` to whitelist the domain for
+Server Action CSRF checks behind the proxy — no code change needed when the
+domain changes, just the env var + redeploy.
 
 ---
 

@@ -9,6 +9,9 @@ import {
 import { applyPaymentResult } from "@/lib/orders";
 
 export const runtime = "nodejs";
+// PayHere's server-to-server callback must never be cached or prerendered,
+// including by a CDN/proxy (Cloudflare) sitting in front of the app.
+export const dynamic = "force-dynamic";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
