@@ -13,7 +13,11 @@ import { toGatewayAmount } from "./money";
 export function payHereConfig() {
   const merchantId = process.env.PAYHERE_MERCHANT_ID?.trim() ?? "";
   const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET?.trim() ?? "";
-  const mode = (process.env.PAYHERE_MODE?.trim() as "sandbox" | "live") ?? "sandbox";
+  // Anything that isn't an explicit, exact "live" stays on the sandbox — a
+  // stray "Live", "production" or typo must never point real money at the
+  // wrong endpoint.
+  const mode: "sandbox" | "live" =
+    process.env.PAYHERE_MODE?.trim().toLowerCase() === "live" ? "live" : "sandbox";
   return {
     merchantId,
     merchantSecret,
@@ -65,13 +69,34 @@ export function buildCheckoutFields(input: {
   itemsLabel: string;
   customer: CheckoutCustomer;
 }): Record<string, string> {
-  const { merchantId } = payHereConfig();
+  const { merchantId, mode } = payHereConfig();
   const base = site.url;
-  return {
+
+  // PayHere rejects the request ("Unauthorized payment request") when the domain
+  // of these URLs is not an approved domain on the merchant account. `localhost`
+  // is auto-approved in sandbox, but shipping it to a live account is a footgun —
+  // fail loudly instead of bouncing the customer to a confusing PayHere page.
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i.test(
+    base,
+  );
+  if (isLocalhost && mode === "live") {
+    throw new Error(
+      `PayHere checkout blocked: PAYHERE_MODE=live but NEXT_PUBLIC_SITE_URL is "${base}". ` +
+        `Set it to the public origin registered as an approved domain in the PayHere dashboard.`,
+    );
+  }
+
+  // PayHere confirms payments only via a server-to-server POST to notify_url, so
+  // it must be publicly reachable. In local dev, point this at a tunnel
+  // (cloudflared / ngrok) while the browser-facing URLs stay on localhost.
+  const notifyUrl =
+    process.env.PAYHERE_NOTIFY_URL?.trim() || `${base}/api/payhere/notify`;
+
+  const fields: Record<string, string> = {
     merchant_id: merchantId,
     return_url: `${base}/order/${input.orderId}`,
     cancel_url: `${base}/order/${input.orderId}?cancelled=1`,
-    notify_url: `${base}/api/payhere/notify`,
+    notify_url: notifyUrl,
     order_id: input.orderNumber,
     items: input.itemsLabel,
     currency: input.currency,
@@ -90,6 +115,19 @@ export function buildCheckoutFields(input: {
       currency: input.currency,
     }),
   };
+
+  if (process.env.PAYHERE_DEBUG === "1") {
+    const { hash, merchant_id, ...rest } = fields;
+    console.info("[payhere] checkout fields", {
+      mode,
+      checkoutUrl: payHereConfig().checkoutUrl,
+      merchant_id: merchant_id ? `${merchant_id.slice(0, 3)}…(${merchant_id.length})` : "(empty)",
+      hash_prefix: hash.slice(0, 8),
+      ...rest,
+    });
+  }
+
+  return fields;
 }
 
 export interface PayHereNotification {
