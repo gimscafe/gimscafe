@@ -109,6 +109,8 @@ npm run dev
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:seed` | (Re)seed catalogue + admin — safe to re-run |
 | `npm run db:backfill-costs` | Copy current cake costs onto older order lines (add `-- --dry-run` to preview) |
+| `npm run admin:create -- <email> <password>` | Create or reset a dashboard admin. With no args it uses `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Upserts by email, so re-running resets that user's password |
+| `npm run admin:create:prod -- <email> <password>` | The same, without `dotenv` — for the Railway shell, where the environment is already injected |
 | `npm run build` / `npm start` | Production build / serve |
 
 ---
