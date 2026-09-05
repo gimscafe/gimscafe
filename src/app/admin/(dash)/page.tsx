@@ -44,7 +44,22 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      <div className="mt-8 flex items-center justify-between">
+      <div className="mt-4 flex justify-end">
+        <Link
+          href="/admin/analytics"
+          className="text-primary inline-flex items-center gap-1 text-sm font-medium"
+        >
+          Analytics <ArrowRight className="size-3.5" />
+        </Link>
+        <Link
+          href="/admin/kpi"
+          className="text-primary ml-4 inline-flex items-center gap-1 text-sm font-medium"
+        >
+          KPI dashboard <ArrowRight className="size-3.5" />
+        </Link>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between">
         <h2 className="font-display text-lg font-semibold">Recent orders</h2>
         <Link
           href="/admin/orders"

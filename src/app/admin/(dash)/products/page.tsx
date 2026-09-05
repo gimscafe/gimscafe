@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Star } from "lucide-react";
+import { Calculator, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { ConfirmSubmit } from "@/components/admin/confirm-submit";
@@ -19,11 +19,18 @@ export default async function AdminProductsPage() {
         title="Cakes"
         description={`${products.length} product${products.length === 1 ? "" : "s"} in the menu`}
         action={
-          <Button asChild size="sm">
-            <Link href="/admin/products/new">
-              <Plus className="size-4" /> New cake
-            </Link>
-          </Button>
+          <>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/products/costs">
+                <Calculator className="size-4" /> Edit costs
+              </Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/admin/products/new">
+                <Plus className="size-4" /> New cake
+              </Link>
+            </Button>
+          </>
         }
       />
 
@@ -33,12 +40,14 @@ export default async function AdminProductsPage() {
             No cakes yet. <Link href="/admin/products/new" className="underline">Add your first</Link>.
           </p>
         ) : (
-          <table className="w-full min-w-[680px] text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr className="text-left">
                 <th className="px-4 py-2.5 font-medium">Cake</th>
                 <th className="px-4 py-2.5 font-medium">Category</th>
                 <th className="px-4 py-2.5 font-medium">Price</th>
+                <th className="px-4 py-2.5 font-medium">Cost</th>
+                <th className="px-4 py-2.5 font-medium">Margin</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
                 <th className="px-4 py-2.5 font-medium"></th>
               </tr>
@@ -65,7 +74,26 @@ export default async function AdminProductsPage() {
                   <td className="text-muted-foreground px-4 py-3">
                     {p.categoryName ?? "—"}
                   </td>
-                  <td className="px-4 py-3">{formatMoney(p.priceCents)}</td>
+                  <td className="px-4 py-3 tabular-nums">{formatMoney(p.priceCents)}</td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {p.costCents > 0 ? (
+                      formatMoney(p.costCents)
+                    ) : (
+                      <Link
+                        href="/admin/products/costs"
+                        className="text-amber-700 underline dark:text-amber-300"
+                      >
+                        Not set
+                      </Link>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {p.costCents > 0 && p.priceCents > 0 ? (
+                      `${(((p.priceCents - p.costCents) / p.priceCents) * 100).toFixed(0)}%`
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {p.isAvailable ? (
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">

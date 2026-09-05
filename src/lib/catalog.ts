@@ -86,6 +86,7 @@ export const listProductsForAdmin = cache(async () => {
       name: products.name,
       slug: products.slug,
       priceCents: products.priceCents,
+      costCents: products.costCents,
       imageUrl: products.imageUrl,
       isAvailable: products.isAvailable,
       isFeatured: products.isFeatured,
@@ -94,5 +95,21 @@ export const listProductsForAdmin = cache(async () => {
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
+    .orderBy(asc(products.sortOrder), desc(products.createdAt));
+});
+
+/** Rows for the bulk cost editor. */
+export const listProductCosts = cache(async () => {
+  const db = getDb();
+  return db
+    .select({
+      id: products.id,
+      name: products.name,
+      slug: products.slug,
+      imageUrl: products.imageUrl,
+      priceCents: products.priceCents,
+      costCents: products.costCents,
+    })
+    .from(products)
     .orderBy(asc(products.sortOrder), desc(products.createdAt));
 });

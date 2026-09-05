@@ -16,7 +16,10 @@
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
     "db:seed": "dotenv -e .env.local -- tsx src/db/seed.ts",
-    "db:seed:prod": "tsx src/db/seed.ts"
+    "db:seed:prod": "tsx src/db/seed.ts",
+    "admin:create": "dotenv -e .env.local -- tsx scripts/create-admin.mts",
+    "admin:create:prod": "tsx scripts/create-admin.mts",
+    "db:backfill-costs": "dotenv -e .env.local -- tsx scripts/backfill-order-costs.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -72,6 +72,7 @@ export async function createOrder(
             productName: l.name,
             productSlug: l.slug,
             unitPriceCents: l.unitPriceCents,
+            unitCostCents: l.unitCostCents,
             quantity: l.quantity,
             lineTotalCents: l.lineTotalCents,
             cakeMessage: l.message || null,

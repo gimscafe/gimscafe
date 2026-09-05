@@ -3,10 +3,23 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
-import { MAX_UPLOAD_BYTES, MIME_EXT, uploadDir } from "@/lib/uploads";
+import {
+  MAX_FILES_PER_REQUEST,
+  MAX_UPLOAD_BYTES,
+  extensionFor,
+  sniffExtension,
+  uploadDir,
+} from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
+const TYPE_HELP = "Use a JPG, PNG, WebP, AVIF or GIF image.";
+
+/**
+ * Stores one or more product images. Send them as `file` (single) or repeated
+ * `files` entries (gallery). Responds with `{ url, urls }` — `url` is the
+ * first upload so single-file callers can keep reading one field.
+ */
 export async function POST(request: Request) {
   if (!(await getAdminSession())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,31 +32,54 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
 
-  const file = form.get("file");
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 });
-  }
-  const ext = MIME_EXT[file.type];
-  if (!ext) {
-    return NextResponse.json(
-      { error: "Unsupported image type (use JPG, PNG, WebP, AVIF or GIF)" },
-      { status: 415 },
-    );
-  }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return NextResponse.json(
-      { error: "Image is larger than 5 MB" },
-      { status: 413 },
-    );
-  }
-
-  const name = `${randomUUID()}.${ext}`;
-  const dir = uploadDir();
-  await mkdir(dir, { recursive: true });
-  await writeFile(
-    path.join(/* turbopackIgnore: true */ dir, name),
-    Buffer.from(await file.arrayBuffer()),
+  const files = [...form.getAll("files"), ...form.getAll("file")].filter(
+    (f): f is File => f instanceof File && f.size > 0,
   );
 
-  return NextResponse.json({ url: `/api/uploads/${name}` });
+  if (files.length === 0) {
+    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+  if (files.length > MAX_FILES_PER_REQUEST) {
+    return NextResponse.json(
+      { error: `Upload at most ${MAX_FILES_PER_REQUEST} images at a time.` },
+      { status: 400 },
+    );
+  }
+
+  const dir = uploadDir();
+  await mkdir(dir, { recursive: true });
+
+  const urls: string[] = [];
+  for (const file of files) {
+    const claimed = extensionFor(file);
+    if (!claimed) {
+      return NextResponse.json(
+        { error: `“${file.name}” is not a supported image. ${TYPE_HELP}` },
+        { status: 415 },
+      );
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { error: `“${file.name}” is larger than 5 MB.` },
+        { status: 413 },
+      );
+    }
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    // Trust the bytes over the extension — a mislabelled JPG is fine, a
+    // non-image pretending to be one is not.
+    const actual = sniffExtension(bytes);
+    if (!actual) {
+      return NextResponse.json(
+        { error: `“${file.name}” does not look like an image file. ${TYPE_HELP}` },
+        { status: 415 },
+      );
+    }
+
+    const name = `${randomUUID()}.${actual}`;
+    await writeFile(path.join(/* turbopackIgnore: true */ dir, name), bytes);
+    urls.push(`/api/uploads/${name}`);
+  }
+
+  return NextResponse.json({ url: urls[0], urls });
 }

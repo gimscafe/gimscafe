@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Toaster } from "@/components/ui/sonner";
+import { VisitTracker } from "@/components/visit-tracker";
 import { site } from "@/lib/site";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
@@ -54,6 +55,7 @@ export default function RootLayout({
           <main className="flex-1">{children}</main>
           <SiteFooter />
           <Toaster richColors position="top-center" />
+          <VisitTracker />
         </ThemeProvider>
       </body>
     </html>

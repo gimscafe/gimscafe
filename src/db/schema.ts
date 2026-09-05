@@ -59,6 +59,8 @@ export const products = pgTable(
     description: text("description"),
     /** price in cents (LKR * 100) */
     priceCents: integer("price_cents").notNull(),
+    /** what this cake costs us to make, in cents. 0 = not costed yet. */
+    costCents: integer("cost_cents").notNull().default(0),
     imageUrl: text("image_url"),
     /** extra gallery images */
     gallery: jsonb("gallery").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
@@ -139,6 +141,8 @@ export const orderItems = pgTable(
     productName: varchar("product_name", { length: 200 }).notNull(),
     productSlug: varchar("product_slug", { length: 200 }),
     unitPriceCents: integer("unit_price_cents").notNull(),
+    /** snapshot of the product cost at purchase time — margins stay historically correct */
+    unitCostCents: integer("unit_cost_cents").notNull().default(0),
     quantity: integer("quantity").notNull(),
     lineTotalCents: integer("line_total_cents").notNull(),
     cakeMessage: varchar("cake_message", { length: 200 }),
@@ -173,6 +177,54 @@ export const paymentEvents = pgTable(
       .on(t.orderId, t.statusCode, t.provider),
   ],
 );
+
+/* -------------------------------------------------------------- site visits */
+
+/**
+ * First-party, cookie-less-ish traffic log written by the client beacon at
+ * /api/track. `visitorId` lives in localStorage (unique visitors), `sessionId`
+ * in sessionStorage (sessions). One row per page view.
+ */
+export const siteVisits = pgTable(
+  "site_visits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    visitorId: varchar("visitor_id", { length: 36 }).notNull(),
+    sessionId: varchar("session_id", { length: 36 }).notNull(),
+    path: varchar("path", { length: 300 }).notNull(),
+    referrerHost: varchar("referrer_host", { length: 200 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("site_visits_created_idx").on(t.createdAt),
+    index("site_visits_visitor_idx").on(t.visitorId),
+  ],
+);
+
+/* -------------------------------------------------------------- kpi inputs */
+
+/**
+ * Figures the storefront cannot know, entered by staff for one calendar month.
+ * Everything is nullable-by-default (0) so a KPI can report "needs input"
+ * rather than quietly showing a wrong number.
+ */
+export const kpiInputs = pgTable("kpi_inputs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** YYYY-MM */
+  period: varchar("period", { length: 7 }).notNull().unique(),
+  /** walk-in / phone / wholesale revenue for the month, in cents */
+  offlineRevenueCents: integer("offline_revenue_cents").notNull().default(0),
+  /** ad spend + promotions attributable to acquiring customers, in cents */
+  marketingCostCents: integer("marketing_cost_cents").notNull().default(0),
+  /** total spend on the digital channel (hosting, site, ads, tooling), in cents */
+  digitalInvestmentCents: integer("digital_investment_cents").notNull().default(0),
+  /** payment gateway fee, in basis points (330 = 3.30%) */
+  gatewayFeeBps: integer("gateway_fee_bps").notNull().default(330),
+  /** how long an average customer keeps buying, in months — drives CLV */
+  customerLifespanMonths: integer("customer_lifespan_months").notNull().default(36),
+  notes: text("notes"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /* -------------------------------------------------------------- relations */
 
@@ -212,3 +264,5 @@ export type NewOrder = typeof orders.$inferInsert;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type OrderStatus = (typeof orderStatusEnum.enumValues)[number];
 export type AdminUser = typeof adminUsers.$inferSelect;
+export type SiteVisit = typeof siteVisits.$inferSelect;
+export type KpiInputs = typeof kpiInputs.$inferSelect;

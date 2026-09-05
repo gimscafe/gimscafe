@@ -6,12 +6,16 @@ import {
   LayoutDashboard,
   ShoppingBag,
   CakeSlice,
+  ChartNoAxesCombined,
+  ChartPie,
   Tags,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/analytics", label: "Analytics", icon: ChartPie },
+  { href: "/admin/kpi", label: "KPIs", icon: ChartNoAxesCombined },
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { href: "/admin/products", label: "Cakes", icon: CakeSlice },
   { href: "/admin/categories", label: "Categories", icon: Tags },
