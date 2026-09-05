@@ -20,6 +20,8 @@ export interface CartLine {
   slug: string;
   imageUrl: string | null;
   unitPriceCents: number;
+  /** cost to make, snapshotted onto the order so margins stay historical */
+  unitCostCents: number;
   quantity: number;
   lineTotalCents: number;
   message?: string;
@@ -110,6 +112,7 @@ export async function getCart(): Promise<Cart> {
       slug: p.slug,
       imageUrl: p.imageUrl,
       unitPriceCents: p.priceCents,
+      unitCostCents: p.costCents,
       quantity,
       lineTotalCents: p.priceCents * quantity,
       message: item.m,

@@ -27,10 +27,22 @@ DNS/CDN.
 **Staff dashboard** (`/admin`)
 - Sign in with a seeded admin account (session cookie, scrypt-hashed password)
 - Dashboard KPIs (orders, awaiting payment, in progress, confirmed revenue)
+- **KPI dashboard** (`/admin/kpi`): eleven business metrics for any month, each
+  showing its formula and the numbers behind it, with a month-on-month delta and
+  a 12-month revenue trend. See [KPI dashboard](#kpi-dashboard) below.
+- **Analytics dashboard** (`/admin/analytics`): the visual read on trading —
+  headline tiles with sparklines, a daily revenue trend, a storefront funnel, an
+  order heatmap, best-sellers, category mix, new-vs-returning cohorts, traffic
+  sources and the kitchen's next fortnight. See
+  [Analytics dashboard](#analytics-dashboard) below.
 - Orders: filter by status, view full detail, change status, see the PayHere
   payment log
-- Cakes: create / edit / delete, image upload or URL, availability & "featured"
-  toggles, gallery images, lead time, sort order
+- Cakes: create / edit / delete, drag-and-drop JPG/PNG upload for the main image
+  and the gallery (or paste a URL), availability & "featured" toggles, lead time,
+  sort order
+- **Cost & margin**: every cake carries a "cost to make"; the bulk editor at
+  `/admin/products/costs` sets them all in one pass, and each order snapshots the
+  cost at purchase time so historical margins stay correct
 - Categories: create / delete
 
 ## Tech stack
@@ -96,6 +108,7 @@ npm run dev
 | `npm run db:push` | Push schema straight to the DB (dev only, no migration file) |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run db:seed` | (Re)seed catalogue + admin — safe to re-run |
+| `npm run db:backfill-costs` | Copy current cake costs onto older order lines (add `-- --dry-run` to preview) |
 | `npm run build` / `npm start` | Production build / serve |
 
 ---
@@ -241,12 +254,104 @@ src/
     actions/             cart.ts, checkout.ts (storefront server actions)
     api/
       payhere/notify/    payment webhook
+      track/             first-party page-view beacon (feeds Conversion Rate)
       uploads/           image upload + serve
   components/            UI + storefront + admin components
   db/                    schema.ts, index.ts (lazy pool), seed.ts
-  lib/                   site config, money, cart, auth, payhere, catalog, orders
+  lib/                   site config, money, cart, auth, payhere, catalog, orders,
+                         kpi, analytics
+  components/admin/charts/  reusable chart primitives (kit, area, funnel, bars,
+                         share, stacked columns, heatmap, stat tile)
 drizzle/                 generated SQL migrations (commit these)
 ```
+
+## Analytics dashboard
+
+`/admin/analytics` is the visual counterpart to the KPI page: where the KPI
+dashboard answers "what are the numbers this month", this one answers "what is
+actually happening". One date-range control at the top (7 / 30 / 90 days or
+12 months) scopes every panel, and each figure is compared against the equally
+long window immediately before it.
+
+| Panel | Form | What it answers |
+|---|---|---|
+| Headline tiles | stat tiles + sparkline | Revenue, orders, AOV, gross profit, visitors, page views |
+| Revenue per day | area + crosshair | Which days actually sell |
+| Storefront funnel | ordinal bars | Where visitors drop out on the way to ordering |
+| When orders come in | heatmap | Which day and hour to staff the kitchen for |
+| Best-selling cakes | bar list | What to keep making |
+| Revenue by category | stacked share bar | Which side of the menu earns |
+| New vs returning | stacked columns | Growth from new faces or from loyalty |
+| Delivery vs collection | share bar | How orders are fulfilled |
+| Traffic sources / pages | bar lists | Where visitors come from and what they read |
+| Order status / delivery areas | bar lists | Operational state and where to drive |
+| Coming up in the kitchen | columns | Orders due over the next 14 days |
+
+### About the charts
+
+Colour is doing one of two jobs and never both at once. **Categorical** slots
+encode identity (which series) in a fixed order that is never cycled or
+reassigned by rank, so a segment keeps its hue when a filter changes. A single
+**rose ramp** encodes magnitude and order — heat cells and funnel stages —
+light to dark in one hue. Both scales live as CSS custom properties
+(`--series-*`, `--ramp-*`) in `globals.css`, are stepped separately for the dark
+surface rather than flipped, and were checked with a palette validator in each
+mode for the lightness band, chroma floor, colour-blind separation and contrast.
+
+Every chart carries a "View as table" disclosure, and any chart with two or more
+series carries a legend — identity is never colour alone.
+
+## KPI dashboard
+
+`/admin/kpi` reports eleven metrics for one calendar month, compared against the
+month before. Month boundaries are cut in `REPORT_TIMEZONE` (default
+`Asia/Colombo`), not UTC.
+
+| Metric | Formula | Source |
+|---|---|---|
+| Online Revenue | Online Orders × AOV | confirmed orders |
+| Revenue Growth % | (Current − Previous) ÷ Previous × 100 | confirmed orders |
+| Digital Sales % | Online Revenue ÷ Total Revenue × 100 | orders + offline revenue input |
+| Average Order Value | Revenue ÷ Number of Orders | confirmed orders |
+| Conversion Rate | Orders ÷ Website Visitors × 100 | orders + visit tracking |
+| Repeat Purchase % | Repeat Customers ÷ Total Customers × 100 | orders, grouped by email |
+| Customer Acquisition Cost | Marketing Cost ÷ New Customers | marketing cost input |
+| Customer Lifetime Value | AOV × Frequency × Lifespan | orders + lifespan assumption |
+| Payment Success % | Successful Payments ÷ Attempts × 100 | `payment_events` |
+| Transaction Cost % | Gateway Fees ÷ Online Revenue × 100 | orders × gateway fee rate |
+| ROI | Incremental Profit ÷ Digital Investment × 100 | all of the above + investment input |
+
+"Confirmed" means any order whose status is not `pending_payment` or
+`cancelled`. Incremental Profit is gross profit (revenue − cost of goods sold)
+less gateway fees and marketing cost.
+
+**A metric with a missing input shows `—` and says what it needs** — it never
+reports a misleading zero.
+
+### What you have to fill in
+
+Three things the storefront cannot know are entered per month at
+`/admin/kpi/inputs`: offline (walk-in) revenue, marketing cost and digital
+investment, plus two assumptions — the gateway fee percentage (default 3.30%)
+and the average customer lifespan in months (default 36).
+
+### Where visitor numbers come from
+
+`components/visit-tracker.tsx` posts one row to `/api/track` per storefront page
+view. A `visitorId` in `localStorage` counts unique visitors and a `sessionId` in
+`sessionStorage` counts sessions; `/admin` pages are excluded. It runs in the
+browser, so crawlers that do not execute JavaScript are naturally left out of the
+conversion denominator. No third-party analytics, no personal data — only the
+referring host is stored, never the full referring URL.
+
+### Costs and profit
+
+Profit, margin and ROI depend on each cake's cost. Set them at
+`/admin/products/costs`. Orders snapshot `unit_cost_cents` at checkout, so
+changing a cake's cost later never rewrites past margins — which also means
+orders placed **before** costs were entered stay at zero until you run
+`npm run db:backfill-costs`. The dashboard warns while any order line in the
+period is uncosted.
 
 ## Notes / possible next steps
 - Transactional email (order confirmation) is not wired up — hook a provider into

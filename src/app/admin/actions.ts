@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { categories, products } from "@/db/schema";
+import { categories, kpiInputs, products } from "@/db/schema";
 import {
   checkCredentials,
   endSession,
@@ -14,7 +14,9 @@ import {
 } from "@/lib/auth";
 import {
   categorySchema,
+  kpiInputsSchema,
   loginSchema,
+  productCostSchema,
   productSchema,
 } from "@/lib/validation";
 import { slugify } from "@/lib/utils";
@@ -68,10 +70,10 @@ export async function saveProduct(
   await requireAdmin();
 
   const id = (formData.get("id") ?? "").toString() || null;
-  const gallery = (formData.get("gallery") ?? "")
-    .toString()
-    .split(/[\n,]/)
-    .map((s) => s.trim())
+  // The gallery arrives as one hidden input per image.
+  const gallery = formData
+    .getAll("gallery")
+    .map((v) => v.toString().trim())
     .filter(Boolean);
 
   const parsed = productSchema.safeParse({
@@ -80,6 +82,7 @@ export async function saveProduct(
     shortDescription: formData.get("shortDescription") ?? "",
     description: formData.get("description") ?? "",
     priceLkr: formData.get("priceLkr"),
+    costLkr: formData.get("costLkr") || 0,
     imageUrl: formData.get("imageUrl") ?? "",
     gallery,
     categoryId: formData.get("categoryId") ?? "",
@@ -107,6 +110,7 @@ export async function saveProduct(
     shortDescription: d.shortDescription || null,
     description: d.description || null,
     priceCents: Math.round(d.priceLkr * 100),
+    costCents: Math.round(d.costLkr * 100),
     imageUrl: d.imageUrl || null,
     gallery: d.gallery ?? [],
     categoryId: d.categoryId || null,
@@ -245,4 +249,116 @@ export async function deleteCategory(formData: FormData): Promise<void> {
     revalidatePath("/admin/categories");
     revalidatePath("/cakes");
   }
+}
+
+/* ------------------------------------------------------------ cake costs */
+
+export interface CostsFormState {
+  error?: string;
+  saved?: number;
+}
+
+/**
+ * Bulk editor for the "cost to make" of every cake — the fastest way to
+ * backfill cakes created before costing existed. Rows arrive as
+ * `cost:<product id>` fields; blank rows are left untouched.
+ */
+export async function saveProductCosts(
+  _prev: CostsFormState,
+  formData: FormData,
+): Promise<CostsFormState> {
+  await requireAdmin();
+
+  const updates: { id: string; costCents: number }[] = [];
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith("cost:")) continue;
+    const raw = value.toString().trim();
+    if (raw === "") continue;
+
+    const parsed = productCostSchema.safeParse({
+      id: key.slice("cost:".length),
+      costLkr: raw,
+    });
+    if (!parsed.success) {
+      return { error: "One of the costs is not a valid amount." };
+    }
+    updates.push({
+      id: parsed.data.id,
+      costCents: Math.round(parsed.data.costLkr * 100),
+    });
+  }
+
+  if (updates.length === 0) return { error: "Nothing to save." };
+
+  const db = getDb();
+  await db.transaction(async (tx) => {
+    for (const u of updates) {
+      await tx
+        .update(products)
+        .set({ costCents: u.costCents, updatedAt: new Date() })
+        .where(eq(products.id, u.id));
+    }
+  });
+
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/costs");
+  revalidatePath("/admin/kpi");
+  return { saved: updates.length };
+}
+
+/* ------------------------------------------------------------ kpi inputs */
+
+export interface KpiInputsFormState {
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+  savedPeriod?: string;
+}
+
+export async function saveKpiInputs(
+  _prev: KpiInputsFormState,
+  formData: FormData,
+): Promise<KpiInputsFormState> {
+  await requireAdmin();
+
+  const parsed = kpiInputsSchema.safeParse({
+    period: formData.get("period"),
+    offlineRevenueLkr: formData.get("offlineRevenueLkr") || 0,
+    marketingCostLkr: formData.get("marketingCostLkr") || 0,
+    digitalInvestmentLkr: formData.get("digitalInvestmentLkr") || 0,
+    gatewayFeePercent: formData.get("gatewayFeePercent") || 0,
+    customerLifespanMonths: formData.get("customerLifespanMonths") || 36,
+    notes: formData.get("notes") ?? "",
+  });
+
+  if (!parsed.success) {
+    return {
+      error: "Please fix the errors below.",
+      fieldErrors: z.flattenError(parsed.error).fieldErrors as Record<
+        string,
+        string[]
+      >,
+    };
+  }
+
+  const d = parsed.data;
+  const values = {
+    period: d.period,
+    offlineRevenueCents: Math.round(d.offlineRevenueLkr * 100),
+    marketingCostCents: Math.round(d.marketingCostLkr * 100),
+    digitalInvestmentCents: Math.round(d.digitalInvestmentLkr * 100),
+    gatewayFeeBps: Math.round(d.gatewayFeePercent * 100),
+    customerLifespanMonths: d.customerLifespanMonths,
+    notes: d.notes || null,
+    updatedAt: new Date(),
+  };
+
+  const db = getDb();
+  await db
+    .insert(kpiInputs)
+    .values(values)
+    .onConflictDoUpdate({ target: kpiInputs.period, set: values });
+
+  revalidatePath("/admin/kpi");
+  revalidatePath("/admin/kpi/inputs");
+  return { savedPeriod: d.period };
 }

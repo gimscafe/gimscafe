@@ -8,6 +8,14 @@ import { adminUsers, categories, products } from "./schema";
 import { hashPassword } from "../lib/password";
 import { slugify } from "../lib/utils";
 
+/**
+ * Starting cost for a seeded cake: a rough 42% of the sale price. It exists so
+ * margin and profit figures are not zero on a fresh database — staff should
+ * replace it with real numbers on /admin/products/costs. Re-seeding never
+ * overwrites an edited cost.
+ */
+const seedCostCents = (priceLkr: number) => Math.round(priceLkr * 0.42) * 100;
+
 const img = (id: string) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1200&q=80`;
 
@@ -239,6 +247,7 @@ async function main() {
         shortDescription: p.short,
         description: p.description,
         priceCents: Math.round(p.priceLkr * 100),
+        costCents: seedCostCents(p.priceLkr),
         imageUrl: p.image,
         gallery: [],
         categoryId,
