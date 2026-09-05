@@ -82,6 +82,27 @@
   --sidebar-accent-foreground: oklch(0.32 0.04 30);
   --sidebar-border: oklch(0.9 0.014 65);
   --sidebar-ring: oklch(0.552 0.146 8);
+
+  /* ---------------------------------------------------------- data viz --
+   * Two jobs, two scales. Categorical slots encode identity (which series)
+   * and come from the validated reference palette in a fixed order — never
+   * cycled, never reassigned by rank. The rose ramp encodes magnitude and
+   * order (heat cells, funnel stages) in a single hue, light to dark.
+   * Both scales are checked with the palette validator in each mode; the
+   * dark values are stepped for the dark surface, not flipped.
+   */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+
+  --ramp-1: #e499a2;
+  --ramp-2: #d77784;
+  --ramp-3: #c5586a;
+  --ramp-4: #ad3a52;
+  --ramp-5: #8f1b39;
 }
 
 .dark {
@@ -103,7 +124,7 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.72 0.14 10);
-  --chart-1: oklch(0.7 0.14 12);
+  --chart-1: oklch(0.66 0.15 12);
   --chart-2: oklch(0.72 0.11 45);
   --chart-3: oklch(0.76 0.09 80);
   --chart-4: oklch(0.68 0.09 300);
@@ -116,6 +137,20 @@
   --sidebar-accent-foreground: oklch(0.955 0.01 70);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.72 0.14 10);
+
+  /* Data-viz scales re-stepped for the dark surface (validated separately). */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+
+  --ramp-1: #8b3343;
+  --ramp-2: #a93f53;
+  --ramp-3: #c94c64;
+  --ramp-4: #e26278;
+  --ramp-5: #f28090;
 }
 
 @layer base {
